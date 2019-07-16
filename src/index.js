@@ -444,6 +444,14 @@ const wrap = (f) => (...args) => {
 };
 
 const translateFileAttributes = (fd, stats) => {
+  if (isTTY(fd)) {
+    return {
+      filetype: WASI_FILETYPE_CHARACTER_DEVICE,
+      rightsBase: RIGHTS_TTY_BASE,
+      rightsInheriting: RIGHTS_TTY_INHERITING,
+    };
+  }
+
   switch (true) {
     case stats.isBlockDevice():
       return {
@@ -452,16 +460,8 @@ const translateFileAttributes = (fd, stats) => {
         rightsInheriting: RIGHTS_BLOCK_DEVICE_INHERITING,
       };
     case stats.isCharacterDevice(): {
-      const filetype = WASI_FILETYPE_CHARACTER_DEVICE;
-      if (fd !== undefined && isTTY(fd)) {
-        return {
-          filetype,
-          rightsBase: RIGHTS_TTY_BASE,
-          rightsInheriting: RIGHTS_TTY_INHERITING,
-        };
-      }
       return {
-        filetype,
+        filetype: WASI_FILETYPE_CHARACTER_DEVICE,
         rightsBase: RIGHTS_CHARACTER_DEVICE_BASE,
         rightsInheriting: RIGHTS_CHARACTER_DEVICE_INHERITING,
       };
@@ -510,8 +510,9 @@ const stat = (wasi, fd) => {
   if (!entry) {
     throw WASI_EBADF;
   }
+
   if (entry.filetype === undefined) {
-    const stats = fs.fstatSync(entry.real);
+    const stats = isTTY(fd) ? void 0 : fs.fstatSync(entry.real);
     const {
       filetype, rightsBase, rightsInheriting,
     } = translateFileAttributes(fd, stats);
